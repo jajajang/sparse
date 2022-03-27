@@ -22,8 +22,9 @@ parser.add_argument("--swap", type=bool, help='Whether we should swap the strate
 parser.add_argument("--inc",type=int, help='Incremental scale of the experiment', default=1000)
 parser.add_argument("--repeat",type=int, help='How many times it will repeat for each experiment setting', default=30)
 parser.add_argument("--howlong",type=int, help='Maximum multiple of T_min for the experiment. For example, howlong=20 means maximum 20000 rounds', default=20)
-parser.add_argument("--T_min",type=int, help='Minimum length of experiment to examine', default=1000)
-parser.add_argument("--sigma",type=int, help='Variance', default=1)
+parser.add_argument("--T_min",type=int, help='Minimum length of experiment to examine', default=0)
+parser.add_argument("--sigma",type=float, help='Variance', default=1)
+parser.add_argument("--delta",type=float, help='Error probability in bandit', default=0.05)
 
 args = parser.parse_args()
 
@@ -40,6 +41,7 @@ def objective_fn(X, Y, beta, lambd):
 
 d=args.d
 s=2
+delta=args.delta
 
 opt=1/np.sqrt(d)
 #create action set that satisfies M2 << Cmin^-1
@@ -73,7 +75,6 @@ print(prob.value)
 Q=A.T@ np.diag(mu_dist) @A
 Q_inv=LA.inv(Q)
 
-
 #Set2: Usual Botao hao setting optimization
 mu_hao=cp.Variable(d, pos=True)
 X_hao=A.T@ cp.diag(mu_hao) @A
@@ -91,6 +92,13 @@ Cmin=prob_hao.value
 print(prob_hao.value)
 
 
+if args.swap:
+    p_first=dist_hao
+    p_second=mu_dist
+else:
+    p_first=mu_dist
+    p_second=dist_hao
+
 
 #Experiment setup - variables
 T0=args.T_min
@@ -102,6 +110,7 @@ sigma=args.sigma
 
 hist_true=np.zeros((wholelength,d))             #history of true theta
 hist_esti=np.zeros((wholelength,d))             #history of the estimated theta by our method
+hist_esti_raw=np.zeros((wholelength,d))
 errors=np.zeros(howlong)                        #l2 error between true and our estimation
 choice_errors=np.zeros(howlong)                 #action error
 
@@ -113,28 +122,36 @@ for i in range(0,howlong):
     T0=T0+args.inc
     print('=====Repetition for total time %d=====' % (T0))
     for rep in range(0,repeative):
-        theta = A[np.random.choice(d)]
-        theta_raw = 0
+        #setting theta - changes over each experiment
+        theta = np.zeros(d)
+        theta[0]=-1
+        theta[np.random.choice(d-1)+1]=np.sqrt(d)
+
+        #same setting from here - threshold and catoni
+        a_true=A[np.argmax(A@theta)]
+        S=np.max(A@theta)
+        vari = (S**2 + sigma**2)*M2
+        threshold = width_catoni(T0,d,delta,vari)
         hist_true[i*repeative+rep]=theta
-        X_hist=np.zeros((d,d))
+        X_hist=np.zeros((T0,d))
         for t in range(0,T0):
-            act_t=A[np.random.choice(d, p=mu_dist)]
+            act_t=A[np.random.choice(d, p=p_first)]
             r=theta@act_t+np.random.normal(0,sigma)
-            theta_raw=theta_raw+r*act_t/T0                  #add reward*action/T0
-            #theta_raw=theta_raw+r*act_t
-            #X_hist=X_hist+np.outer(act_t, act_t)
-        theta_hat=Q_inv@theta_raw
+            X_hist[t]=r*(Q_inv@act_t)
+        theta_hat_raw=catoni_esti(X_hist,delta,vari)
+        hist_esti_raw[i*repeative+rep]=theta_hat_raw
+        theta_hat=(np.abs(theta_hat_raw)>threshold)*theta_hat_raw
         #theta_hat=LA.inv(X_hist)@theta_raw
         hist_esti[i*repeative+rep]=theta_hat
         errors[i]+=LA.norm(theta-theta_hat)
         a_hat=A[np.argmax(A@theta_hat)]
-        choice_errors[i]+=LA.norm(theta-a_hat)
+        choice_errors[i]+=LA.norm(a_true-a_hat)
 
 
         hist_b=np.zeros((T0, d))                        #temporary history for the action of Hao's method, since it computes LASSO optimization
         r_b=np.zeros(T0)                                #temporary history for the reward
         for t in range(0,T0):
-            act_h_t = A[np.random.choice(d, p=dist_hao)]
+            act_h_t = A[np.random.choice(d, p=p_second)]
             hist_b[t]=act_h_t
             r_b[t] = theta @ act_h_t + np.random.normal(0, sigma)
         beta = cp.Variable(d)
