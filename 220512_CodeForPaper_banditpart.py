@@ -155,7 +155,7 @@ hist_act_oful=np.zeros((repeative,T0,d))
 cum_regret_oful=np.zeros((repeative,T0))
 for rep in range(0,repeative):
     #setting theta - changes over each experiment
-
+    print('Try!')
     #theta=A[np.random.randint(d)]
     theta = np.zeros(d)
     theta[0]=1
@@ -164,10 +164,9 @@ for rep in range(0,repeative):
     #same setting from here - threshold and catoni
     a_true=A[np.argmax(A@theta)]
     S=np.max(np.abs(A@theta))
-    # vari = (S**2 + sigma**2)*M2
-    vari = 2*(sigma**2)*M2
-    #T_exp = int(2*((s*sigma*T0/S)**2*M2*np.log(2*d/delta))**(1/3))
+    vari = (S**2 + sigma**2)*M2
     T_exp = int(((s*T0/S)**2*vari*np.log(2*d/delta))**(1/3))
+    T_exp = np.min((T0, T_exp))
 
     threshold = width_catoni(T_exp,d,delta,vari)
     hist_true[rep]=theta
@@ -202,7 +201,7 @@ for rep in range(0,repeative):
         cum_reg_hao+=theta@(a_true-act_h_t)
         cum_regret_hao[rep][t]=cum_reg_hao
     beta = cp.Variable(d)
-    lambd_b = 4 * np.sqrt(np.log(d) * T_exp_hao)
+    lambd_b = 4 * sigma*np.sqrt(np.log(d) * T_exp_hao)
     lassosol = cp.Problem(cp.Minimize(objective_fn(hist_b, r_b, beta, lambd_b)))
     lassosol.solve()
     beta_hat = beta.value

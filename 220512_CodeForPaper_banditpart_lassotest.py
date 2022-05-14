@@ -200,7 +200,7 @@ for rep in range(0,repeative):
         cum_reg_hao+=theta@(a_true-act_h_t)
         cum_regret_hao[rep][t]=cum_reg_hao
     beta = cp.Variable(d)
-    lambd_b = 4 * np.sqrt(np.log(d)/ T_exp_hao)
+    lambd_b = 4 * sigma*np.sqrt(np.log(d)/ T_exp_hao)
     lassosol = cp.Problem(cp.Minimize(objective_fn(hist_b, r_b, beta, lambd_b,T_exp_hao)))
     lassosol.solve()
     beta_hat = beta.value

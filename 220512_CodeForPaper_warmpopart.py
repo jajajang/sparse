@@ -169,7 +169,7 @@ for i in range(0,howlong):
             hist_b[t]=act_h_t
             r_b[t] = theta @ act_h_t + np.random.normal(0, sigma)
         beta = cp.Variable(d)
-        lambd_b = 4 * np.sqrt(np.log(d) * T0)
+        lambd_b = 4 * sigma*np.sqrt(np.log(d) * T0)
         lassosol = cp.Problem(cp.Minimize(objective_fn(hist_b, r_b, beta, lambd_b)))
         lassosol.solve()
         beta_hat = beta.value
