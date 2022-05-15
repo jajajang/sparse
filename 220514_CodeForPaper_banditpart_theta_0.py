@@ -18,13 +18,14 @@ from cvxpy.constraints.constraint import Constraint
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--d", type=int, help="dimension of the action vector", default=50)
-parser.add_argument("--swap", type=bool, help='Whether we should swap the strategy between Haos exploration and ours', default=False)
+parser.add_argument("--same", type=bool, help='Whether we should same strategy which is ours', default=False)
 parser.add_argument("--repeat",type=int, help='How many times it will repeat for each experiment setting', default=30)
 parser.add_argument("--T0",type=int, help='Length of experiment to examine', default=10000)
 parser.add_argument("--sigma",type=float, help='Variance', default=1)
 parser.add_argument("--delta",type=float, help='Error probability in bandit', default=0.05)
 parser.add_argument("--action_set", help='Which action will I use? uniform or hard', default='hard')
 parser.add_argument("--multiplier", type=float, help='Scale exploration time', default=1)
+parser.add_argument("--cheat", type=float, help='theta_0 = cheat * theta', default=0)
 args = parser.parse_args()
 
 
@@ -103,8 +104,8 @@ Cmin=prob_hao.value
 print(prob_hao.value)
 
 
-if args.swap:
-    p_first=dist_hao
+if args.same:
+    p_first=mu_dist
     p_second=mu_dist
 else:
     p_first=mu_dist
@@ -129,18 +130,20 @@ hist_act_oful=np.zeros((repeative,T0,d))
 cum_regret_oful=np.zeros((repeative,T0))
 for rep in range(0,repeative):
     #setting theta - changes over each experiment
-    indy=np.random.choice(d,s,replace=False)
     theta=np.zeros(d)
-    for indi in range(0,s):
-        theta[indy[indi]]=1
-    #theta = np.zeros(d)
-    #theta[0]=1
-    #theta[np.random.choice(d-1)+1]=1
-
+    if args.action_set=='uniform':
+        indy=np.random.choice(d,s,replace=False)
+        for indi in range(0,s):
+            theta[indy[indi]]=1
+    elif args.action_set=='hard':
+        theta[0]=1
+        theta[np.random.choice(d-1)+1]=1
+    theta_0 = args.cheat*theta
     #same setting from here - threshold and catoni
     a_true=A[np.argmax(A@theta)]
-    S=np.max(np.abs(A@theta))
-    vari = (S**2 + sigma**2)*M2
+    S=np.max(np.abs(A@(theta)))
+    S_0=np.max(np.abs(A@(theta-theta_0)))
+    vari = (S_0**2 + sigma**2)*M2
     T_exp = int(args.multiplier*((s*T0/S)**2*vari*np.log(2*d/delta))**(1/3))
 
     threshold = width_catoni(T_exp,d,delta,vari)
@@ -152,7 +155,7 @@ for rep in range(0,repeative):
         r=theta@act_t+np.random.normal(0,sigma)
         cum_reg+=theta@(a_true-act_t)
         cum_regret[rep][t]=cum_reg
-        X_hist[t]=r*(Q_inv@act_t)
+        X_hist[t]=(r-act_t@theta_0)*(Q_inv@act_t)+theta_0
     theta_hat_raw=catoni_esti(X_hist,delta,vari)
     hist_esti_raw[rep]=theta_hat_raw
     theta_hat=(np.abs(theta_hat_raw)>threshold)*theta_hat_raw
@@ -167,7 +170,7 @@ for rep in range(0,repeative):
     T_exp_hao=np.min((T0, T_exp_hao))
     hist_b=np.zeros((T_exp_hao, d))                        #temporary history for the action of Hao's method, since it computes LASSO optimization
     r_b=np.zeros(T_exp_hao)                                #temporary history for the reward
-
+    
     cum_reg_hao=0
     for t in range(0,T_exp_hao):
         act_h_t = A[np.random.choice(N_a, p=p_second)]
