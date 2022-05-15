@@ -23,7 +23,8 @@ parser.add_argument("--repeat",type=int, help='How many times it will repeat for
 parser.add_argument("--T0",type=int, help='Length of experiment to examine', default=10000)
 parser.add_argument("--sigma",type=float, help='Variance', default=1)
 parser.add_argument("--delta",type=float, help='Error probability in bandit', default=0.05)
-
+parser.add_argument("--action_set", help='Which action will I use? uniform or hard', default='hard')
+parser.add_argument("--multiplier", type=float, help='Scale exploration time', default=1)
 args = parser.parse_args()
 
 
@@ -40,33 +41,25 @@ def objective_fn(X, Y, beta, lambd,n0):
 d=args.d
 s=2
 delta=args.delta
-N_a=3*d
+N_a=d
 opt=1/np.sqrt(d)
 #create action set that satisfies M2 << Cmin^-1
 A=np.zeros((N_a,d))
-for i in range(0,N_a):
-    A[i]=np.random.normal(0,1,d)
-    A[i]=A[i]/LA.norm(A[i])
 
-'''A[0][0]=opt
-for i in range(1,d):
-    A[i][0]=1
-    A[i][i]=opt
-'''
+if args.action_set=='uniform':
+    N_a=3*d
+    A=np.zeros((N_a,d))
+    for i in range(0,N_a):
+        A[i]=np.random.normal(0,1,d)
+        A[i]=A[i]/LA.norm(A[i])
+elif args.action_set=='hard':
+    A[0][0]=opt
+    for i in range(1,d):
+        A[i][0]=1
+        A[i][i]=opt
+else:
+    print("Error: no action set")
 #Set1: Our Settings
-'''
-mu=cp.Variable(d, pos=True)
-X=A.T@ cp.diag(mu) @A
-
-T = Variable((d, d), symmetric=True)
-M = bmat([[X, np.eye(d)],
-          [np.eye(d), T]])
-constraints = [M >> 0, cp.sum(mu)==1]
-objective = cp.Minimize(cp.max(cp.diag(T)))
-
-prob=cp.Problem(objective, constraints)
-prob.solve(solver=cp.MOSEK,verbose=True)
-'''
 #results of set1
 
 mu=cp.Variable(N_a, pos=True)
@@ -93,22 +86,6 @@ Q=A.T@ np.diag(mu_dist) @A
 Q_inv=LA.inv(Q)
 
 #Set2: Usual Botao hao setting optimization
-'''
-mu_hao=cp.Variable(d, pos=True)
-X_hao=A.T@ cp.diag(mu_hao) @A
-
-constraints_hao = [cp.sum(mu_hao)==1]
-prob_hao = cp.Problem(cp.Maximize(cp.lambda_min(X_hao)), constraints_hao)
-prob_hao.solve(solver=cp.MOSEK, verbose=True)
-
-print('Set2 Optimization Finished\n')
-print('Mu_hao')
-print(mu_hao.value)
-dist_hao=mu_hao.value/np.sum(mu_hao.value)
-print('Cmin')
-Cmin=prob_hao.value
-print(prob_hao.value)
-'''
 
 mu_hao=cp.Variable(N_a, pos=True)
 X_hao=A.T@ cp.diag(mu_hao) @A
@@ -163,11 +140,10 @@ for rep in range(0,repeative):
     #same setting from here - threshold and catoni
     a_true=A[np.argmax(A@theta)]
     S=np.max(np.abs(A@theta))
-    # vari = (S**2 + sigma**2)*M2
-    vari = 2*(sigma**2)*M2
-    T_exp = int(2*((s*sigma*T0/S)**2*M2*np.log(2*d/delta))**(1/3))
+    vari = (S**2 + sigma**2)*M2
+    T_exp = int(args.multiplier*((s*T0/S)**2*vari*np.log(2*d/delta))**(1/3))
 
-    threshold = width_catoni(T0,d,delta,vari)
+    threshold = width_catoni(T_exp,d,delta,vari)
     hist_true[rep]=theta
     X_hist=np.zeros((T_exp,d))
     cum_reg=0                                       #temporary variable for cumulative regret
@@ -187,7 +163,7 @@ for rep in range(0,repeative):
         cum_regret[rep][t]=cum_reg
 
 
-    T_exp_hao=int((2*(s*sigma*T0/S/Cmin)**2*np.log(d))**(1/3))
+    T_exp_hao=int(args.multiplier*(2*(s*sigma*T0/S/Cmin)**2*np.log(d))**(1/3))
     T_exp_hao=np.min((T0, T_exp_hao))
     hist_b=np.zeros((T_exp_hao, d))                        #temporary history for the action of Hao's method, since it computes LASSO optimization
     r_b=np.zeros(T_exp_hao)                                #temporary history for the reward
@@ -218,7 +194,7 @@ for rep in range(0,repeative):
     V_inv=LA.inv(V)
     theta_oful=np.zeros(d)
     b_t=np.zeros(d)
-    logdetV0=LA.det(V)
+    logdetV0=np.log(LA.det(V))
     logdetV=logdetV0
     for t in range(0,T0):
         betty= sigma * np.sqrt(logdetV - logdetV0 + np.log(1 / (delta ** 2)))
@@ -227,9 +203,8 @@ for rep in range(0,repeative):
         r_t = a_oful_t@theta + np.random.normal(0,sigma)
         cum_reg_oful+=theta@(a_true-a_oful_t)
         cum_regret_oful[rep][t]=cum_reg_oful
-
         V+=np.outer(a_oful_t, a_oful_t)
-        logdetV=LA.det(V)
+        logdetV=np.log(LA.det(V))
         b_t+=r_t*a_oful_t
         V_inv=LA.inv(V)
         theta_oful=V_inv@b_t
@@ -251,11 +226,10 @@ mean_hao=np.mean(cum_regret_hao,0)
 plt.plot(timeline,mean_hao, label='Cmin-LASSO')
 plt.fill_between(timeline, mean_hao-vari_hao, mean_hao+vari_hao, color='bisque', alpha=0.5)
 
-'''
 vari_oful=np.std(cum_regret_oful,0)
 mean_oful=np.mean(cum_regret_oful,0)
 plt.plot(timeline, mean_oful, label='OFUL')
 plt.fill_between(timeline, mean_oful-vari_oful, mean_oful+vari_oful, color='green')
-'''
+
 plt.legend()
 plt.show()

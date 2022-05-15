@@ -23,7 +23,7 @@ parser.add_argument("--repeat",type=int, help='How many times it will repeat for
 parser.add_argument("--T0",type=int, help='Length of experiment to examine', default=10000)
 parser.add_argument("--sigma",type=float, help='Variance', default=1)
 parser.add_argument("--delta",type=float, help='Error probability in bandit', default=0.05)
-
+parser.add_argument("--multiplier", type=float, help='Scale exploration time', default=1)
 args = parser.parse_args()
 
 
@@ -165,7 +165,7 @@ for rep in range(0,repeative):
     a_true=A[np.argmax(A@theta)]
     S=np.max(np.abs(A@theta))
     vari = (S**2 + sigma**2)*M2
-    T_exp = int(((s*T0/S)**2*vari*np.log(2*d/delta))**(1/3))
+    T_exp = int(args.multiplier*((s*T0/S)**2*vari*np.log(2*d/delta))**(1/3))
     T_exp = np.min((T0, T_exp))
 
     threshold = width_catoni(T_exp,d,delta,vari)
@@ -188,7 +188,7 @@ for rep in range(0,repeative):
         cum_regret[rep][t]=cum_reg
 
 
-    T_exp_hao=int((2*(s*sigma*T0/S/Cmin)**2*np.log(d))**(1/3))
+    T_exp_hao=int(args.multiplier*(2*(s*sigma*T0/S/Cmin)**2*np.log(d))**(1/3))
     T_exp_hao=np.min((T0, T_exp_hao))
     hist_b=np.zeros((T_exp_hao, d))                        #temporary history for the action of Hao's method, since it computes LASSO optimization
     r_b=np.zeros(T_exp_hao)                                #temporary history for the reward
@@ -222,7 +222,7 @@ for rep in range(0,repeative):
     logdetV0=LA.det(V)
     logdetV=logdetV0
     for t in range(0,T0):
-        betty= sigma * np.sqrt(logdetV - logdetV0 + np.log(1 / (delta ** 2)))
+        betty= sigma * np.sqrt(logdetV - logdetV0 + np.log(1 / (delta ** 2))) +np.norm(theta)
         a_oful_t=A[np.argmax(A@theta_oful+betty*np.sqrt(np.diag(A@V_inv@A.T)))]
         hist_act_oful[rep][t]=a_oful_t
         r_t = a_oful_t@theta + np.random.normal(0,sigma)
