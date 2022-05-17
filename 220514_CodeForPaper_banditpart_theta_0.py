@@ -226,7 +226,10 @@ plt.fill_between(timeline, mean_our-vari_our, mean_our+vari_our, color='cornflow
 
 vari_hao=np.std(cum_regret_hao,0)
 mean_hao=np.mean(cum_regret_hao,0)
-plt.plot(timeline,mean_hao, label='Cmin-LASSO')
+if args.same:
+    plt.plot(timeline,mean_hao, label='H2-LASSO')
+else:
+    plt.plot(timeline,mean_hao, label='Cmin-LASSO')
 plt.fill_between(timeline, mean_hao-vari_hao, mean_hao+vari_hao, color='bisque', alpha=0.5)
 '''
 vari_oful=np.std(cum_regret_oful,0)

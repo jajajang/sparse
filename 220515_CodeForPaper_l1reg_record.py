@@ -196,10 +196,13 @@ plt.ylabel('l1 estimation errors')
 plt.title('H_*=%.2f, 1/Cmin=%.2f, sigma=%.2f'%(np.sqrt(M2), 1/Cmin, sigma))
 plt.plot(timeline,errors, label='PopART')
 plt.errorbar(timeline, errors, vari_our, color='cornflowerblue', alpha=0.5)
+np.savetxt("H2-PopArt with d_%d_sigma_%.2f_H2=%.2f_Cmin_%.2f.csv"%(d, sigma, np.sqrt(M2), 1/Cmin), (errors, vari_our))
 if args.same:
     plt.plot(timeline, errors_hao, label='H2-LASSO')
+    np.savetxt("H2-Lasso with d_%d_sigma_%.2f_H2=%.2f_Cmin_%.2f.csv"%(d, sigma, np.sqrt(M2), 1/Cmin), (errors_hao, vari_hao))
 else:
     plt.plot(timeline,errors_hao, label='Cmin-LASSO')
+    np.savetxt("Cmin-Lasso with d_%d_sigma_%.2f_H2=%.2f_Cmin_%.2f.csv"%(d, sigma, np.sqrt(M2), 1/Cmin), (errors_hao, vari_hao))
 plt.errorbar(timeline, errors_hao, vari_hao, color='bisque', alpha=0.5)
 
 plt.legend()
