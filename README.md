@@ -3,7 +3,7 @@ This is the code for the paper 'PopArt : efficient sparse regression and experim
 (Under cleaning up the code)
 
 ## Requirement:
-python 3.7 with numpy, scipy, sklearn, cvxpy, mosek
+python 3.7 with numpy, scipy, sklearn, cvxpy, mosek, matplotlib
 
 ## To replicate the result:
 For the l1 estimation error result of Figure 1 (row 1) in the paper, use
