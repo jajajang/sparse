@@ -18,50 +18,61 @@ from cvxpy.constraints.constraint import Constraint
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--d", type=int, help="dimension of the action vector", default=50)
-parser.add_argument("--swap", type=bool, help='Whether we should swap the strategy between Haos exploration and ours', default=False)
-parser.add_argument("--repeat",type=int, help='How many times it will repeat for each experiment setting', default=30)
+parser.add_argument("--s", type=int, help="sparsity of the hidden parameter vector", default=2)
+parser.add_argument("--same", type=bool, help='Whether we should use equal strategy which is ours', default=False)
+parser.add_argument("--repeat",type=int, help='How many times it will repeat for each experiment setting', default=10)
 parser.add_argument("--T0",type=int, help='Length of experiment to examine', default=10000)
-parser.add_argument("--sigma",type=float, help='Variance', default=1)
+parser.add_argument("--sigma",type=float, help='Variance', default=0.1)
 parser.add_argument("--delta",type=float, help='Error probability in bandit', default=0.05)
-parser.add_argument("--action_set", help='Which action will I use? uniform or hard', default='hard')
-parser.add_argument("--multiplier", type=float, help='Scale exploration time', default=1)
+parser.add_argument("--action_set", help='which action will I use - \'hard\' is Case 1 in the figure, and \'uniform\' is the Case 2 in the figure', default='hard')
+parser.add_argument("--num_of_action_set", type=int, help='Number of actions in the action set in Case 2. Case 1 has fixed number of actions', default=150),
+parser.add_argument("--cheat", type=float, help='theta_0 = cheat * theta', default=0)
 args = parser.parse_args()
 
 
-def loss_fn(X, Y, beta,n0):
-    return cp.norm2(X @ beta - Y) ** 2 / n0
+# functions for the optimization of lasso. Basically cvxpy format functions.
+def loss_fn(X, Y, beta):
+    return cp.norm2(X @ beta - Y) ** 2
 
 def regularizer(beta):
     return cp.norm1(beta)
 
-def objective_fn(X, Y, beta, lambd,n0):
-    return loss_fn(X, Y, beta,n0) + lambd * regularizer(beta)
+def objective_fn(X, Y, beta, lambd):
+    return loss_fn(X, Y, beta) + lambd * regularizer(beta)
 
 
+#basic settings
 d=args.d
-s=2
+s=args.s
 delta=args.delta
-N_a=d
-opt=1/np.sqrt(d)
-#create action set that satisfies M2 << Cmin^-1
-A=np.zeros((N_a,d))
 
-if args.action_set=='uniform':
-    N_a=3*d
-    A=np.zeros((N_a,d))
-    for i in range(0,N_a):
-        A[i]=np.random.normal(0,1,d)
-        A[i]=A[i]/LA.norm(A[i])
-elif args.action_set=='hard':
+N_a = args.num_of_action_set
+A= np.zeros((N_a,d))
+# Case 1 action set: action set that satisfies M2 << Cmin^-1
+# create action set that satisfies M2 << Cmin^-1
+if args.action_set=='hard':
+    N_a = d
+    opt = 1 / np.sqrt(d)
+    A=np.zeros((d,d))
     A[0][0]=opt
     for i in range(1,d):
         A[i][0]=1
         A[i][i]=opt
-else:
-    print("Error: no action set")
-#Set1: Our Settings
-#results of set1
 
+# Case 2 action set: Drawn uniformly from the unit sphere.
+elif args.action_set=='uniform':
+    A=np.zeros((N_a,d))
+    for i in range(0,N_a):
+        A[i]=np.random.normal(0,1,d)
+        A[i]=A[i]/LA.norm(A[i])
+
+else:
+    print('Error: Invalid action set')
+
+
+########################## Exploration plan optimization stage ################################
+
+#Set1: Our Settings - Minimizing maximum diagonal entry of the inverse covariance matrix: max_i (Q^-1)_ii
 mu=cp.Variable(N_a, pos=True)
 X=A.T@ cp.diag(mu) @A
 
@@ -74,9 +85,9 @@ objective = cp.Minimize(cp.max(cp.diag(T)))
 prob=cp.Problem(objective, constraints)
 prob.solve(solver=cp.MOSEK,verbose=True)
 
+#results of set1
 M2=prob.value
 print('Set1 Optimization Finished\n')
-
 print('Mu')
 print(mu.value)
 mu_dist=mu.value/np.sum(mu.value)
@@ -85,8 +96,9 @@ print(prob.value)
 Q=A.T@ np.diag(mu_dist) @A
 Q_inv=LA.inv(Q)
 
-#Set2: Usual Botao hao setting optimization
 
+
+#Set2: Setting of Botao Hao (2021) - Maximizing minimum eigenvalue of the covariance matrix
 mu_hao=cp.Variable(N_a, pos=True)
 X_hao=A.T@ cp.diag(mu_hao) @A
 
@@ -103,44 +115,54 @@ Cmin=prob_hao.value
 print(prob_hao.value)
 
 
-if args.swap:
-    p_first=dist_hao
+# To compare the pure estimation performance between Lasso and PopArt.
+# Green line of the experiment, H2-Lasso is the setting when args.same=True
+
+if args.same:
+    p_first=mu_dist
     p_second=mu_dist
 else:
     p_first=mu_dist
     p_second=dist_hao
 
 
+
+
+
 #Experiment setup - variables
-T0=args.T0
-repeative=args.repeat
-sigma=args.sigma
+T0=args.T0                                      # Total number of rounds in bandit problem
+repeative=args.repeat                           # How many times we repeat the same setting
+sigma=args.sigma                                # Variance of the noise
 
 
-hist_true=np.zeros((repeative,d))             #history of true theta
-hist_esti=np.zeros((repeative,d))             #history of the estimated theta by our method
-hist_esti_raw=np.zeros((repeative,d))
-cum_regret=np.zeros((repeative,T0))
+hist_true=np.zeros((repeative,d))               #history of true theta
+hist_esti=np.zeros((repeative,d))               #history of the estimated theta by our method
+hist_esti_raw=np.zeros((repeative,d))           #history of the estimated theta by our method before thresholding
+cum_regret=np.zeros((repeative,T0))             #Cumulative regret of our setting
 
-hist_esti_hao=np.zeros((repeative,d))         #history of the estimated theta by Hao's method
-cum_regret_hao=np.zeros((repeative,T0))
+hist_esti_hao=np.zeros((repeative,d))           #history of the estimated theta by Hao's method
+cum_regret_hao=np.zeros((repeative,T0))         #Cumulative regret of the Hao's setting
 
-hist_act_oful=np.zeros((repeative,T0,d))
-cum_regret_oful=np.zeros((repeative,T0))
+
+
 for rep in range(0,repeative):
     #setting theta - changes over each experiment
-    indy=np.random.choice(d,s,replace=False)
     theta=np.zeros(d)
-    for indi in range(0,s):
-        theta[indy[indi]]=1
-    #theta = np.zeros(d)
-    #theta[0]=1
-    #theta[np.random.choice(d-1)+1]=1
+    if args.action_set=='uniform':
+        indy=np.random.choice(d,s,replace=False)
+        for indi in range(0,s):
+            theta[indy[indi]]=1
+    elif args.action_set=='hard':
+        theta[0]=1
+        theta[np.random.choice(d-1)+1]=1
 
-    #same setting from here - threshold and catoni
+    theta_0 = args.cheat*theta                  #PopArt can exploit pilot estimator when the agent has one. For basic setup, this cheat is always 0 and we didn't actually use it.
     a_true=A[np.argmax(A@theta)]
-    S=np.max(np.abs(A@theta))
-    vari = (S**2 + sigma**2)*M2
+
+    # Experiment 1: PopArt experiment
+    S=np.max(np.abs(A@(theta)))
+    S_0=np.max(np.abs(A@(theta-theta_0)))
+    vari = (S_0**2 + sigma**2)*M2
     T_exp = int(args.multiplier*((s*T0/S)**2*vari*np.log(2*d/delta))**(1/3))
 
     threshold = width_catoni(T_exp,d,delta,vari)
@@ -152,7 +174,7 @@ for rep in range(0,repeative):
         r=theta@act_t+np.random.normal(0,sigma)
         cum_reg+=theta@(a_true-act_t)
         cum_regret[rep][t]=cum_reg
-        X_hist[t]=r*(Q_inv@act_t)
+        X_hist[t]=(r-act_t@theta_0)*(Q_inv@act_t)+theta_0
     theta_hat_raw=catoni_esti(X_hist,delta,vari)
     hist_esti_raw[rep]=theta_hat_raw
     theta_hat=(np.abs(theta_hat_raw)>threshold)*theta_hat_raw
@@ -163,11 +185,12 @@ for rep in range(0,repeative):
         cum_regret[rep][t]=cum_reg
 
 
+    #Experiment 2 - Botao Hao setting experiment
     T_exp_hao=int(args.multiplier*(2*(s*sigma*T0/S/Cmin)**2*np.log(d))**(1/3))
     T_exp_hao=np.min((T0, T_exp_hao))
     hist_b=np.zeros((T_exp_hao, d))                        #temporary history for the action of Hao's method, since it computes LASSO optimization
     r_b=np.zeros(T_exp_hao)                                #temporary history for the reward
-
+    
     cum_reg_hao=0
     for t in range(0,T_exp_hao):
         act_h_t = A[np.random.choice(N_a, p=p_second)]
@@ -188,27 +211,8 @@ for rep in range(0,repeative):
         cum_regret_hao[rep][t] = cum_reg_hao
 
 
-###########OFUL
-    cum_reg_oful=0
-    V=np.eye(d)
-    V_inv=LA.inv(V)
-    theta_oful=np.zeros(d)
-    b_t=np.zeros(d)
-    logdetV0=np.log(LA.det(V))
-    logdetV=logdetV0
-    for t in range(0,T0):
-        betty= sigma * np.sqrt(logdetV - logdetV0 + np.log(1 / (delta ** 2)))
-        a_oful_t=A[np.argmax(A@theta_oful+betty*np.sqrt(np.diag(A@V_inv@A.T)))]
-        hist_act_oful[rep][t]=a_oful_t
-        r_t = a_oful_t@theta + np.random.normal(0,sigma)
-        cum_reg_oful+=theta@(a_true-a_oful_t)
-        cum_regret_oful[rep][t]=cum_reg_oful
-        V+=np.outer(a_oful_t, a_oful_t)
-        logdetV=np.log(LA.det(V))
-        b_t+=r_t*a_oful_t
-        V_inv=LA.inv(V)
-        theta_oful=V_inv@b_t
 
+# Plot Session
 
 import matplotlib.pyplot as plt
 timeline=list(range(T0))
@@ -223,13 +227,10 @@ plt.fill_between(timeline, mean_our-vari_our, mean_our+vari_our, color='cornflow
 
 vari_hao=np.std(cum_regret_hao,0)
 mean_hao=np.mean(cum_regret_hao,0)
-plt.plot(timeline,mean_hao, label='Cmin-LASSO')
+if args.same:
+    plt.plot(timeline,mean_hao, label='H2-LASSO')
+else:
+    plt.plot(timeline,mean_hao, label='Cmin-LASSO')
 plt.fill_between(timeline, mean_hao-vari_hao, mean_hao+vari_hao, color='bisque', alpha=0.5)
-'''
-vari_oful=np.std(cum_regret_oful,0)
-mean_oful=np.mean(cum_regret_oful,0)
-plt.plot(timeline, mean_oful, label='OFUL')
-plt.fill_between(timeline, mean_oful-vari_oful, mean_oful+vari_oful, color='green')
-'''
 plt.legend()
 plt.show()
