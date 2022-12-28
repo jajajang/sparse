@@ -21,7 +21,7 @@ from cvxpy.constraints.constraint import Constraint
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--d", type=int, help="dimension of the action vector", default=50)
+parser.add_argument("--d", type=int, help="dimension of the action vector", default=10)
 parser.add_argument("--s", type=int, help="sparsity of the hidden parameter vector", default=2)
 parser.add_argument("--same", type=bool, help='Whether we should use equal strategy which is ours', default=False)
 parser.add_argument("--inc",type=int, help='Incremental scale of the experiment', default=1000)

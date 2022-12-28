@@ -17,7 +17,7 @@ from cvxpy.constraints.constraint import Constraint
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--d", type=int, help="dimension of the action vector", default=50)
+parser.add_argument("--d", type=int, help="dimension of the action vector", default=30)
 parser.add_argument("--s", type=int, help="sparsity of the hidden parameter vector", default=2)
 parser.add_argument("--same", type=bool, help='Whether we should use equal strategy which is ours', default=False)
 parser.add_argument("--repeat",type=int, help='How many times it will repeat for each experiment setting', default=10)
@@ -25,21 +25,21 @@ parser.add_argument("--T0",type=int, help='Length of experiment to examine', def
 parser.add_argument("--sigma",type=float, help='Variance', default=0.1)
 parser.add_argument("--delta",type=float, help='Error probability in bandit', default=0.05)
 parser.add_argument("--action_set", help='which action will I use - \'hard\' is Case 1 in the figure, and \'uniform\' is the Case 2 in the figure', default='hard')
-parser.add_argument("--num_of_action_set", type=int, help='Number of actions in the action set in Case 2. Case 1 has fixed number of actions', default=150),
+parser.add_argument("--num_of_action_set", type=int, help='Number of actions in the action set in Case 2. Case 1 has fixed number of actions', default=90),
 parser.add_argument("--cheat", type=float, help='theta_0 = cheat * theta', default=0)
 args = parser.parse_args()
 
 
 # functions for the optimization of lasso. Basically cvxpy format functions.
-def loss_fn(X, Y, beta):
-    return cp.norm2(X @ beta - Y) ** 2
+
+def loss_fn(X, Y, beta,n0):
+    return cp.norm2(X @ beta - Y) ** 2 / n0
 
 def regularizer(beta):
     return cp.norm1(beta)
 
-def objective_fn(X, Y, beta, lambd):
-    return loss_fn(X, Y, beta) + lambd * regularizer(beta)
-
+def objective_fn(X, Y, beta, lambd,n0):
+    return loss_fn(X, Y, beta,n0) + lambd * regularizer(beta)
 
 #basic settings
 d=args.d
@@ -163,7 +163,7 @@ for rep in range(0,repeative):
     S=np.max(np.abs(A@(theta)))
     S_0=np.max(np.abs(A@(theta-theta_0)))
     vari = (S_0**2 + sigma**2)*M2
-    T_exp = int(args.multiplier*((s*T0/S)**2*vari*np.log(2*d/delta))**(1/3))
+    T_exp = int(((s*T0/S)**2*vari*np.log(2*d/delta))**(1/3))
 
     threshold = width_catoni(T_exp,d,delta,vari)
     hist_true[rep]=theta
@@ -186,7 +186,7 @@ for rep in range(0,repeative):
 
 
     #Experiment 2 - Botao Hao setting experiment
-    T_exp_hao=int(args.multiplier*(2*(s*sigma*T0/S/Cmin)**2*np.log(d))**(1/3))
+    T_exp_hao=int((2*(s*sigma*T0/S/Cmin)**2*np.log(d))**(1/3))
     T_exp_hao=np.min((T0, T_exp_hao))
     hist_b=np.zeros((T_exp_hao, d))                        #temporary history for the action of Hao's method, since it computes LASSO optimization
     r_b=np.zeros(T_exp_hao)                                #temporary history for the reward

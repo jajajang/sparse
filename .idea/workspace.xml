@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="b62b05ec-3005-4cfe-811a-5da50d4de756" name="Changes" comment="" />
+    <list default="true" id="b62b05ec-3005-4cfe-811a-5da50d4de756" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/221222_CodeForPaper_final_version_l1reg.py" beforeDir="false" afterPath="$PROJECT_DIR$/221222_CodeForPaper_final_version_l1reg.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/221227_CodeForPaper_final_version_banditpart_theta_0.py" beforeDir="false" afterPath="$PROJECT_DIR$/221227_CodeForPaper_final_version_banditpart_theta_0.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -14,17 +18,18 @@
     <option name="stateVersion" value="1" />
   </component>
   <component name="ProjectId" id="2JHzT9d9VWBjG9ymo9weOaGBJRA" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "last_opened_file_path": "/Users/kyoungseok/Documents/GitHub/sparse"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/kyoungseok/Documents/GitHub/sparse&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$" />
