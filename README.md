@@ -5,6 +5,8 @@ This is the code for the paper 'PopArt : efficient sparse regression and experim
 ## Requirement:
 python 3.7 with numpy, scipy, sklearn, cvxpy, mosek, matplotlib
 
+Especially about mosek, you need an additional license file to actually use the package.
+
 ## To replicate the result:
 For the l1 estimation error result of Figure 1 (row 1) in the paper, use
 
